@@ -66,7 +66,7 @@ type pluralTest struct {
 	plural Plural
 }
 
-func TestArabic(t *testing.T ) {
+func TestArabic(t *testing.T) {
 	tests := []pluralTest{
 		{0, Zero},
 		{"0", Zero},
@@ -387,6 +387,17 @@ func TestPortugueseBrazilian(t *testing.T) {
 	}
 	tests = appendFloatTests(tests, 2.0, 10.0, Other)
 	runTests(t, "pt-br", tests)
+}
+
+func TestRomanian(t *testing.T) {
+	tests := []pluralTest{
+		{0, Other},
+		{1, One},
+		{onePlusEpsilon, Other},
+		{2, Other},
+	}
+	tests = appendFloatTests(tests, 0.0, 10.0, Other)
+	runTests(t, "ro", tests)
 }
 
 func TestRussian(t *testing.T) {
