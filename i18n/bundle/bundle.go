@@ -258,7 +258,7 @@ func (b *Bundle) translate(lang *language.Language, translationID string, args .
 
 func isNumber(n interface{}) bool {
 	switch n.(type) {
-	case int, int8, int16, int32, int64, string:
+	case int, int8, int16, int32, int64, string, float32, float64:
 		return true
 	}
 	return false
