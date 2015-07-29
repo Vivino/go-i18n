@@ -31,8 +31,7 @@ func newOperands(v interface{}) (*operands, error) {
 	case string:
 		return newOperandsString(v)
 	case float32, float64:
-		return newOperandsString(fmt.Sprintf("%f", v)), nil
-		//return nil, fmt.Errorf("floats should be formatted into a string")
+		return newOperandsString(fmt.Sprintf("%f", v))
 	default:
 		return nil, fmt.Errorf("invalid type %T; expected integer or string", v)
 	}
