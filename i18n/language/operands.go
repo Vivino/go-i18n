@@ -30,8 +30,26 @@ func newOperands(v interface{}) (*operands, error) {
 		return newOperandsInt64(v), nil
 	case string:
 		return newOperandsString(v)
-	case float32, float64:
+	case float32:
 		return newOperandsString(fmt.Sprintf("%f", v))
+	case float64:
+		return newOperandsString(fmt.Sprintf("%f", v))
+	case uint:
+		if v > 9223372036854775807 {
+			v = 9223372036854775807
+		}
+		return newOperandsInt64(int64(v)), nil
+	case uint8:
+		return newOperandsInt64(int64(v)), nil
+	case uint16:
+		return newOperandsInt64(int64(v)), nil
+	case uint32:
+		return newOperandsInt64(int64(v)), nil
+	case uint64:
+		if v > 9223372036854775807 {
+			v = 9223372036854775807
+		}
+		return newOperandsInt64(int64(v)), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T; expected integer or string", v)
 	}
