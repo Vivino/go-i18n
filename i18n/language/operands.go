@@ -2,6 +2,7 @@ package language
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -35,8 +36,8 @@ func newOperands(v interface{}) (*operands, error) {
 	case float64:
 		return newOperandsString(fmt.Sprintf("%f", v))
 	case uint:
-		if v > 9223372036854775807 {
-			v = 9223372036854775807
+		if v > math.MaxInt64 {
+			v = math.MaxInt64
 		}
 		return newOperandsInt64(int64(v)), nil
 	case uint8:
@@ -46,8 +47,8 @@ func newOperands(v interface{}) (*operands, error) {
 	case uint32:
 		return newOperandsInt64(int64(v)), nil
 	case uint64:
-		if v > 9223372036854775807 {
-			v = 9223372036854775807
+		if v > math.MaxInt64 {
+			v = math.MaxInt64
 		}
 		return newOperandsInt64(int64(v)), nil
 	default:
