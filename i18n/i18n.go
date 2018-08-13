@@ -63,12 +63,21 @@ import (
 
 // TranslateFunc returns the translation of the string identified by translationID.
 //
+// If there is no translation for translationID, then the translationID itself is returned.
+// This makes it easy to identify missing translations in your app.
+//
 // If translationID is a non-plural form, then the first variadic argument may be a map[string]interface{}
 // or struct that contains template data.
 //
-// If translationID is a plural form, then the first variadic argument must be an integer type
+// If translationID is a plural form, the function accepts two parameter signatures
+// 1. T(count int, data struct{})
+// The first variadic argument must be an integer type
 // (int, int8, int16, int32, int64) or a float formatted as a string (e.g. "123.45").
-// The second variadic argument may be a map[string]interface{} or struct that contains template data.
+// The second variadic argument may be a map[string]interface{} or struct{} that contains template data.
+// 2. T(data struct{})
+// data must be a struct{} or map[string]interface{} that contains a Count field and the template data,
+// Count field must be an integer type (int, int8, int16, int32, int64)
+// or a float formatted as a string (e.g. "123.45").
 type TranslateFunc func(translationID string, args ...interface{}) string
 
 // IdentityTfunc returns a TranslateFunc that always returns the translationID passed to it.
@@ -110,6 +119,16 @@ func ParseTranslationFileBytes(filename string, buf []byte) error {
 // It is useful if your translations are in a format not supported by LoadTranslationFile.
 func AddTranslation(lang *language.Language, translations ...translation.Translation) {
 	defaultBundle.AddTranslation(lang, translations...)
+}
+
+// LanguageTags returns the tags of all languages that have been added.
+func LanguageTags() []string {
+	return defaultBundle.LanguageTags()
+}
+
+// LanguageTranslationIDs returns the ids of all translations that have been added for a given language.
+func LanguageTranslationIDs(languageTag string) []string {
+	return defaultBundle.LanguageTranslationIDs(languageTag)
 }
 
 // MustTfunc is similar to Tfunc except it panics if an error happens.

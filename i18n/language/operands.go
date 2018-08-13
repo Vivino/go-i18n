@@ -7,17 +7,49 @@ import (
 	"strings"
 )
 
-// http://unicode.org/reports/tr35/tr35-numbers.html#Operands
-type operands struct {
+// Operands is a representation of http://unicode.org/reports/tr35/tr35-numbers.html#Operands
+type Operands struct {
 	N float64 // absolute value of the source number (integer and decimals)
 	I int64   // integer digits of n
-	V int     // number of visible fraction digits in n, with trailing zeros
-	W int     // number of visible fraction digits in n, without trailing zeros
-	F int     // visible fractional digits in n, with trailing zeros
-	T int     // visible fractional digits in n, without trailing zeros
+	V int64   // number of visible fraction digits in n, with trailing zeros
+	W int64   // number of visible fraction digits in n, without trailing zeros
+	F int64   // visible fractional digits in n, with trailing zeros
+	T int64   // visible fractional digits in n, without trailing zeros
 }
 
-func newOperands(v interface{}) (*operands, error) {
+// NequalsAny returns true if o represents an integer equal to any of the arguments.
+func (o *Operands) NequalsAny(any ...int64) bool {
+	for _, i := range any {
+		if o.I == i && o.T == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// NmodEqualsAny returns true if o represents an integer equal to any of the arguments modulo mod.
+func (o *Operands) NmodEqualsAny(mod int64, any ...int64) bool {
+	modI := o.I % mod
+	for _, i := range any {
+		if modI == i && o.T == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// NinRange returns true if o represents an integer in the closed interval [from, to].
+func (o *Operands) NinRange(from, to int64) bool {
+	return o.T == 0 && from <= o.I && o.I <= to
+}
+
+// NmodInRange returns true if o represents an integer in the closed interval [from, to] modulo mod.
+func (o *Operands) NmodInRange(mod, from, to int64) bool {
+	modI := o.I % mod
+	return o.T == 0 && from <= modI && modI <= to
+}
+
+func newOperands(v interface{}) (*Operands, error) {
 	switch v := v.(type) {
 	case int:
 		return newOperandsInt64(int64(v)), nil
@@ -56,14 +88,14 @@ func newOperands(v interface{}) (*operands, error) {
 	}
 }
 
-func newOperandsInt64(i int64) *operands {
+func newOperandsInt64(i int64) *Operands {
 	if i < 0 {
 		i = -i
 	}
-	return &operands{float64(i), i, 0, 0, 0, 0}
+	return &Operands{float64(i), i, 0, 0, 0, 0}
 }
 
-func newOperandsString(s string) (*operands, error) {
+func newOperandsString(s string) (*Operands, error) {
 	if s[0] == '-' {
 		s = s[1:]
 	}
@@ -71,7 +103,7 @@ func newOperandsString(s string) (*operands, error) {
 	if err != nil {
 		return nil, err
 	}
-	ops := &operands{N: n}
+	ops := &Operands{N: n}
 	parts := strings.SplitN(s, ".", 2)
 	ops.I, err = strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
@@ -81,7 +113,7 @@ func newOperandsString(s string) (*operands, error) {
 		return ops, nil
 	}
 	fraction := parts[1]
-	ops.V = len(fraction)
+	ops.V = int64(len(fraction))
 	for i := ops.V - 1; i >= 0; i-- {
 		if fraction[i] != '0' {
 			ops.W = i + 1
@@ -93,14 +125,14 @@ func newOperandsString(s string) (*operands, error) {
 		if err != nil {
 			return nil, err
 		}
-		ops.F = int(f)
+		ops.F = f
 	}
 	if ops.W > 0 {
 		t, err := strconv.ParseInt(fraction[:ops.W], 10, 0)
 		if err != nil {
 			return nil, err
 		}
-		ops.T = int(t)
+		ops.T = t
 	}
 	return ops, nil
 }
