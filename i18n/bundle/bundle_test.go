@@ -2,7 +2,12 @@ package bundle
 
 import (
 	"fmt"
+	"strconv"
+	"sync"
 	"testing"
+
+	"reflect"
+	"sort"
 
 	"github.com/nicksnyder/go-i18n/i18n/language"
 	"github.com/nicksnyder/go-i18n/i18n/translation"
@@ -31,6 +36,31 @@ func TestMustTfunc(t *testing.T) {
 		}
 	}()
 	New().MustTfunc("invalid")
+}
+
+func TestLanguageTagsAndTranslationIDs(t *testing.T) {
+	b := New()
+	translationID := "translation_id"
+	englishLanguage := languageWithTag("en-US")
+	frenchLanguage := languageWithTag("fr-FR")
+	spanishLanguage := languageWithTag("es")
+	addFakeTranslation(t, b, englishLanguage, "English"+translationID)
+	addFakeTranslation(t, b, frenchLanguage, translationID)
+	addFakeTranslation(t, b, spanishLanguage, translationID)
+
+	tags := b.LanguageTags()
+	sort.Strings(tags)
+	compareTo := []string{englishLanguage.Tag, spanishLanguage.Tag, frenchLanguage.Tag}
+	if !reflect.DeepEqual(tags, compareTo) {
+		t.Errorf("LanguageTags() = %#v; expected: %#v", tags, compareTo)
+	}
+
+	ids := b.LanguageTranslationIDs(englishLanguage.Tag)
+	sort.Strings(ids)
+	compareTo = []string{"English" + translationID}
+	if !reflect.DeepEqual(ids, compareTo) {
+		t.Errorf("LanguageTranslationIDs() = %#v; expected: %#v", ids, compareTo)
+	}
 }
 
 func TestTfuncAndLanguage(t *testing.T) {
@@ -132,6 +162,59 @@ func TestTfuncAndLanguage(t *testing.T) {
 	}
 }
 
+func TestConcurrent(t *testing.T) {
+	b := New()
+	// bootstrap bundle
+	translationID := "translation_id" // +1
+	englishLanguage := languageWithTag("en-US")
+	addFakeTranslation(t, b, englishLanguage, translationID)
+
+	tf, err := b.Tfunc(englishLanguage.Tag)
+	if err != nil {
+		t.Errorf("Tfunc(%v) = error{%q}; expected no error", []string{englishLanguage.Tag}, err)
+	}
+
+	const iterations = 1000
+	var wg sync.WaitGroup
+	wg.Add(iterations)
+
+	// Using go routines insert 1000 ints into our map.
+	go func() {
+		for i := 0; i < iterations/2; i++ {
+			// Add item to map.
+			translationID := strconv.FormatInt(int64(i), 10)
+			addFakeTranslation(t, b, englishLanguage, translationID)
+
+			// Retrieve item from map.
+			tf(translationID)
+
+			wg.Done()
+		} // Call go routine with current index.
+	}()
+
+	go func() {
+		for i := iterations / 2; i < iterations; i++ {
+			// Add item to map.
+			translationID := strconv.FormatInt(int64(i), 10)
+			addFakeTranslation(t, b, englishLanguage, translationID)
+
+			// Retrieve item from map.
+			tf(translationID)
+
+			wg.Done()
+		} // Call go routine with current index.
+	}()
+
+	// Wait for all go routines to finish.
+	wg.Wait()
+
+	// Make sure map contains 1000+1 elements.
+	count := len(b.Translations()[englishLanguage.Tag])
+	if count != iterations+1 {
+		t.Error("Expecting 1001 elements, got", count)
+	}
+}
+
 func addFakeTranslation(t *testing.T, b *Bundle, lang *language.Language, translationID string) string {
 	translation := fakeTranslation(lang, translationID)
 	b.AddTranslation(lang, testNewTranslation(t, map[string]interface{}{
@@ -157,58 +240,123 @@ func languageWithTag(tag string) *language.Language {
 	return language.MustParse(tag)[0]
 }
 
-func createBenchmarkTranslateFunc(b *testing.B) func(data interface{}) {
+func createBenchmarkTranslateFunc(b *testing.B, translationTemplate interface{}, count interface{}, expected string) func(data interface{}) {
 	bundle := New()
 	lang := "en-US"
 	translationID := "translation_id"
 	translation, err := translation.NewTranslation(map[string]interface{}{
-		"id": translationID,
-		"translation": map[string]interface{}{
-			"one":   "{{.Person}} is {{.Count}} year old.",
-			"other": "{{.Person}} is {{.Count}} years old.",
-		},
+		"id":          translationID,
+		"translation": translationTemplate,
 	})
 	if err != nil {
 		b.Fatal(err)
 	}
 	bundle.AddTranslation(languageWithTag(lang), translation)
-	expected := "Bob is 26 years old."
-
 	tf, err := bundle.Tfunc(lang)
 	if err != nil {
 		b.Fatal(err)
 	}
-
 	return func(data interface{}) {
-		if result := tf(translationID, 26, data); result != expected {
+		var result string
+		if count == nil {
+			result = tf(translationID, data)
+		} else {
+			result = tf(translationID, count, data)
+		}
+		if result != expected {
 			b.Fatalf("expected %q, got %q", expected, result)
 		}
 	}
 }
 
-func BenchmarkTranslateWithMap(b *testing.B) {
+func createBenchmarkPluralTranslateFunc(b *testing.B) func(data interface{}) {
+	translationTemplate := map[string]interface{}{
+		"one":   "{{.Person}} is {{.Count}} year old.",
+		"other": "{{.Person}} is {{.Count}} years old.",
+	}
+	count := 26
+	expected := "Bob is 26 years old."
+	return createBenchmarkTranslateFunc(b, translationTemplate, count, expected)
+}
+
+func createBenchmarkNonPluralTranslateFunc(b *testing.B) func(data interface{}) {
+	translationTemplate := "Hi {{.Person}}!"
+	expected := "Hi Bob!"
+	return createBenchmarkTranslateFunc(b, translationTemplate, nil, expected)
+}
+
+func BenchmarkTranslateNonPluralWithMap(b *testing.B) {
 	data := map[string]interface{}{
 		"Person": "Bob",
 	}
-	tf := createBenchmarkTranslateFunc(b)
+	tf := createBenchmarkNonPluralTranslateFunc(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tf(data)
 	}
 }
 
-func BenchmarkTranslateWithStruct(b *testing.B) {
+func BenchmarkTranslateNonPluralWithStruct(b *testing.B) {
 	data := struct{ Person string }{Person: "Bob"}
-	tf := createBenchmarkTranslateFunc(b)
+	tf := createBenchmarkNonPluralTranslateFunc(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tf(data)
 	}
 }
 
-func BenchmarkTranslateWithStructPointer(b *testing.B) {
+func BenchmarkTranslateNonPluralWithStructPointer(b *testing.B) {
 	data := &struct{ Person string }{Person: "Bob"}
-	tf := createBenchmarkTranslateFunc(b)
+	tf := createBenchmarkNonPluralTranslateFunc(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tf(data)
+	}
+}
+
+func BenchmarkTranslatePluralWithMap(b *testing.B) {
+	data := map[string]interface{}{
+		"Person": "Bob",
+	}
+	tf := createBenchmarkPluralTranslateFunc(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tf(data)
+	}
+}
+
+func BenchmarkTranslatePluralWithMapAndCountField(b *testing.B) {
+	data := map[string]interface{}{
+		"Person": "Bob",
+		"Count":  26,
+	}
+
+	translationTemplate := map[string]interface{}{
+		"one":   "{{.Person}} is {{.Count}} year old.",
+		"other": "{{.Person}} is {{.Count}} years old.",
+	}
+	expected := "Bob is 26 years old."
+
+	tf := createBenchmarkTranslateFunc(b, translationTemplate, nil, expected)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tf(data)
+	}
+}
+
+func BenchmarkTranslatePluralWithStruct(b *testing.B) {
+	data := struct{ Person string }{Person: "Bob"}
+	tf := createBenchmarkPluralTranslateFunc(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tf(data)
+	}
+}
+
+func BenchmarkTranslatePluralWithStructPointer(b *testing.B) {
+	data := &struct{ Person string }{Person: "Bob"}
+	tf := createBenchmarkPluralTranslateFunc(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tf(data)

@@ -16,8 +16,8 @@ func TestParse(t *testing.T) {
 		{"en-GB", []*Language{{"en-gb", pluralSpecs["en"]}}},
 		{"zh-CN", []*Language{{"zh-cn", pluralSpecs["zh"]}}},
 		{"zh-TW", []*Language{{"zh-tw", pluralSpecs["zh"]}}},
-		{"pt-BR", []*Language{{"pt-br", pluralSpecs["pt-br"]}}},
-		{"pt_BR", []*Language{{"pt-br", pluralSpecs["pt-br"]}}},
+		{"pt-BR", []*Language{{"pt-br", pluralSpecs["pt"]}}},
+		{"pt_BR", []*Language{{"pt-br", pluralSpecs["pt"]}}},
 		{"pt-PT", []*Language{{"pt-pt", pluralSpecs["pt"]}}},
 		{"pt_PT", []*Language{{"pt-pt", pluralSpecs["pt"]}}},
 		{"zh-Hans-CN", []*Language{{"zh-hans-cn", pluralSpecs["zh"]}}},
@@ -64,7 +64,7 @@ func TestParse(t *testing.T) {
 	for _, test := range tests {
 		lang := Parse(test.src)
 		if !reflect.DeepEqual(lang, test.lang) {
-			t.Errorf("Parse(%q) = %q expected %q", test.src, lang, test.lang)
+			t.Errorf("Parse(%q) = %s expected %s", test.src, lang, test.lang)
 		}
 	}
 }

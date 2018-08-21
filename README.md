@@ -1,178 +1,117 @@
-go-i18n [![Build Status](https://secure.travis-ci.org/nicksnyder/go-i18n.png?branch=master)](http://travis-ci.org/nicksnyder/go-i18n)
-=======
+# go-i18n [![Build Status](https://travis-ci.org/nicksnyder/go-i18n.svg?branch=master)](http://travis-ci.org/nicksnyder/go-i18n) [![Report card](https://goreportcard.com/badge/github.com/nicksnyder/go-i18n)](https://goreportcard.com/report/github.com/nicksnyder/go-i18n) [![Sourcegraph](https://sourcegraph.com/github.com/nicksnyder/go-i18n/-/badge.svg)](https://sourcegraph.com/github.com/nicksnyder/go-i18n?badge)
 
-go-i18n is a Go [package](#i18n-package) and a [command](#goi18n-command) that can be used to translate Go programs into multiple languages.
-* Supports pluralized strings using [CLDR plural rules](http://cldr.unicode.org/index/cldr-spec/plural-rules).
+go-i18n is a Go [package](#package-i18n) and a [command](#command-goi18n) that helps you translate Go programs into multiple languages.
+
+* Supports [pluralized strings](http://cldr.unicode.org/index/cldr-spec/plural-rules) for all 200+ languages in the [Unicode Common Locale Data Repository (CLDR)](http://www.unicode.org/cldr/charts/28/supplemental/language_plural_rules.html).
+  * Code and tests are [automatically generated](https://github.com/nicksnyder/go-i18n/tree/master/i18n/language/codegen) from [CLDR data](http://cldr.unicode.org/index/downloads)
 * Supports strings with named variables using [text/template](http://golang.org/pkg/text/template/) syntax.
-* Translation files are simple JSON.
+* Supports message files of any format (e.g. JSON, TOML, YAML, etc.).
 * [Documented](http://godoc.org/github.com/nicksnyder/go-i18n) and [tested](https://travis-ci.org/nicksnyder/go-i18n)!
 
-Package i18n [![GoDoc](http://godoc.org/github.com/nicksnyder/go-i18n?status.png)](http://godoc.org/github.com/nicksnyder/go-i18n/i18n)
-------------
+## Versions
 
-The i18n package provides runtime APIs for fetching translated strings.
+* v1 is available at 1.x.x tags.
+* v2 is available at 2.x.x tags.
 
-Command goi18n [![GoDoc](http://godoc.org/github.com/nicksnyder/go-i18n?status.png)](http://godoc.org/github.com/nicksnyder/go-i18n/goi18n)
---------------
+This README always documents the latest version (i.e. v2).
 
-The goi18n command provides functionality for managing the translation process.
+## Package i18n [![GoDoc](http://godoc.org/github.com/nicksnyder/go-i18n?status.svg)](http://godoc.org/github.com/nicksnyder/go-i18n/v2/i18n)
 
-### Installation
+The i18n package provides support for looking up messages according to a set of locale preferences.
 
-Make sure you have [setup GOPATH](http://golang.org/doc/code.html#GOPATH).
-
-    go get -u github.com/nicksnyder/go-i18n/goi18n
-    goi18n -help
-
-### Workflow
-
-A typical workflow looks like this:
-
-1. Add a new string to your source code.
-
-    ```go
-    T("settings_title")
-    ```
-
-2. Add the string to en-US.all.json
-
-    ```json
-    [
-      {
-        "id": "settings_title",
-        "translation": "Settings"
-      }
-    ]
-    ```
-
-3. Run goi18n
-
-    ```
-    goi18n path/to/*.all.json
-    ```
-
-4. Send `path/to/*.untranslated.json` to get translated.
-5. Run goi18n again to merge the translations
-
-    ```sh
-    goi18n path/to/*.all.json path/to/*.untranslated.json
-    ```
-
-Translation files
------------------
-
-A translation file stores translated and untranslated strings.
-
-Example:
-
-```json
-[
-  {
-    "id": "d_days",
-    "translation": {
-      "one": "{{.Count}} day",
-      "other": "{{.Count}} days"
-    }
-  },
-  {
-    "id": "my_height_in_meters",
-    "translation": {
-      "one": "I am {{.Count}} meter tall.",
-      "other": "I am {{.Count}} meters tall."
-    }
-  },
-  {
-    "id": "person_greeting",
-    "translation": "Hello {{.Person}}"
-  },
-  {
-    "id": "person_unread_email_count",
-    "translation": {
-      "one": "{{.Person}} has {{.Count}} unread email.",
-      "other": "{{.Person}} has {{.Count}} unread emails."
-    }
-  },
-  {
-    "id": "person_unread_email_count_timeframe",
-    "translation": {
-      "one": "{{.Person}} has {{.Count}} unread email in the past {{.Timeframe}}.",
-      "other": "{{.Person}} has {{.Count}} unread emails in the past {{.Timeframe}}."
-    }
-  },
-  {
-    "id": "program_greeting",
-    "translation": "Hello world"
-  },
-  {
-    "id": "your_unread_email_count",
-    "translation": {
-      "one": "You have {{.Count}} unread email.",
-      "other": "You have {{.Count}} unread emails."
-    }
-  }
-]
+```go
+import "github.com/nicksnyder/go-i18n/v2/i18n"
 ```
 
-Supported languages
--------------------
+Create a Bundle to use for the lifetime of your application.
 
-* Arabic (`ar`)
-* Belarusian (`be`)
-* Bulgarian (`bg`)
-* Burmese (`my`)
-* Catalan (`ca`)
-* Chinese (simplified and traditional) (`zh`)
-* Czech (`cs`)
-* Danish (`da`)
-* Dutch (`nl`)
-* English (`en`)
-* French (`fr`)
-* German (`de`)
-* Icelandic (`is`)
-* Indonesian (`id`)
-* Italian (`it`)
-* Korean (`ko`)
-* Japanese (`ja`)
-* Lithuanian (`lt`)
-* Malay (`ms`)
-* Polish (`pl`)
-* Portuguese (`pt`)
-* Portuguese (Brazilian) (`pt-BR`)
-* Russian (`ru`)
-* Spanish (`es`)
-* Swedish (`sv`)
-* Turkish (`tr`)
-* Ukrainian (`uk`)
+```go
+bundle := &i18n.Bundle{DefaultLanguage: language.English}
+```
 
-Adding new languages
---------------------
+Create a Localizer to use for a set of language preferences.
 
-It is easy to add support for additional languages:
+```go
+func(w http.ResponseWriter, r *http.Request) {
+    lang := r.FormValue("lang")
+    accept := r.Header.Get("Accept-Language")
+    localizer := i18n.NewLocalizer(bundle, lang, accept)
+}
+```
 
-1. Lookup the language's [CLDR plural rules](http://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html).
-2. Add the language to [pluralspec.go](i18n/language/pluralspec.go):
+Use the Localizer to lookup messages.
 
-    ```go
-    var pluralSpecs = map[string]*PluralSpec{
-        // ...
-				// English
-				"en": &PluralSpec{
-					Plurals: newPluralSet(One, Other),
-					PluralFunc: func(ops *operands) Plural {
-						if ops.I == 1 && ops.V == 0 {
-							return One
-						}
-						return Other
-					},
-				},
-        // ...
-    }
-    ```
+```go
+localizer.MustLocalize(&i18n.LocalizeConfig{
+    DefaultMessage: &i18n.Message{
+        ID: "PersonCats",
+        One: "{{.Name}} has {{.Count}} cat.",
+        Other: "{{.Name}} has {{.Count}} cats.",
+    },
+    TemplateData: map[string]string{
+        "Name": "Nick",
+        "Count": 2,
+    },
+    PluralCount: 2,
+}) // Nick has 2 cats.
+```
 
-3. Add a test to [pluralspec_test.go](i18n/language/pluralspec_test.go)
-4. Update this README with the new language.
-5. Submit a pull request!
+It requires Go 1.9 or newer.
 
-License
--------
+## Command goi18n [![GoDoc](http://godoc.org/github.com/nicksnyder/go-i18n?status.svg)](http://godoc.org/github.com/nicksnyder/go-i18n/v2/goi18n)
+
+The goi18n command manages message files used by the i18n package.
+
+```
+go get -u github.com/nicksnyder/go-i18n/v2/goi18n
+goi18n -help
+```
+
+Use `goi18n extract` to create a message file that contains the messages defined in your Go source files.
+
+```toml
+# en.toml
+[PersonCats]
+description = "The number of cats a person has"
+one = "{{.Name}} has {{.Count}} cat."
+other = "{{.Name}} has {{.Count}} cats."
+```
+
+Use `goi18n merge` to create message files for translation.
+
+```toml
+# translate.es.toml
+[PersonCats]
+description = "The number of cats a person has"
+hash = "sha1-f937a0e05e19bfe6cd70937c980eaf1f9832f091"
+one = "{{.Name}} has {{.Count}} cat."
+other = "{{.Name}} has {{.Count}} cats."
+```
+
+Use `goi18n merge` to merge translated message files with your existing message files.
+
+```toml
+# active.es.toml
+[PersonCats]
+description = "The number of cats a person has"
+hash = "sha1-f937a0e05e19bfe6cd70937c980eaf1f9832f091"
+one = "{{.Name}} tiene {{.Count}} gato."
+other = "{{.Name}} tiene {{.Count}} gatos."
+```
+
+Load the active messages into your bundle.
+
+```go
+bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
+bundle.MustLoadMessageFile("active.es.toml")
+```
+
+## For more information and examples:
+
+* Read the [documentation](http://godoc.org/github.com/nicksnyder/go-i18n/v2/i18n).
+* Look at the [code examples](https://github.com/nicksnyder/go-i18n/blob/master/v2/i18n/example_test.go) and [tests](https://github.com/nicksnyder/go-i18n/blob/master/v2/i18n/localizer_test.go).
+* Look at an example [application](https://github.com/nicksnyder/go-i18n/tree/master/v2/example).
+
+## License
+
 go-i18n is available under the MIT license. See the [LICENSE](LICENSE) file for more info.
